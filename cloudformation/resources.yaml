@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: AWS CloudFormation workshop - Resources (uksb-1q9p31idr).
+
+# Add Format Version section here.
+
+# Add Description section here.
+
+# Add Metadata section here.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+    ParameterLabels:
+      ProjectName:
+        default: "Name of project"
+
+# Add Parameters section here.
+Parameters:
+  ProjectName:
+    Type: String
+    Description: "Enter your project name."
+
+# Add Resources section here.
+Resources:
+  ChatInstance1:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      InstanceType: t3.micro
+      ImageId: ami-06fdbb60c8e83aa5e
+      KeyName: "tokyo"
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            Encrypted: false
+            VolumeSize: 200
+            VolumeType: "gp2"
+            DeleteOnTermination: true
+      Tags:
+        - Key: "Name"
+          Value: !Join ["-", [!Ref ProjectName, "1"]]
+
+  ChatInstance2:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-06fdbb60c8e83aa5e
+      KeyName: "tokyo"
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            Encrypted: false
+            VolumeSize: 300
+            VolumeType: "gp2"
+            DeleteOnTermination: true
+      Tags:
+        - Key: "Name"
+          Value: !Join ["-", [!Ref ProjectName, "2"]]
+
+# Add Outputs section here.
+# Outputs:
+#   NLBPublicDNS:
+#     Description: "Public DNS of Elastic Load Balancer"
+#     Value: !GetAtt ElasticLoadBalancingV2LoadBalancer.DNSName

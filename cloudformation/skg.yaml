@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: AWS CloudFormation template.
+
+# Add Metadata section here.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - SubnetID
+      - Label:
+          default: "Keypair Configuration"
+        Parameters:
+          - KeyName
+    ParameterLabels:
+      ProjectName:
+        default: "Name of project"
+      SubnetID:
+        default: "ID of subnet"
+      KeyName:
+        default: "Name of keypair"
+
+# Add Parameters section here.
+Parameters:
+  ProjectName:
+    Type: String
+    Description: "Enter your project name."
+  SubnetID:
+    Type: "AWS::EC2::Subnet::Id"
+    Description: "Select your Subnet ID."
+  KeyName:
+    Type: "AWS::EC2::KeyPair::KeyName"
+    Description: "Select your key name."
+
+# Add Resources section here.
+Resources:
+  LBEIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: "vpc"
+      Tags:
+        - Key: "Name"
+          Value: !Join ["-", ["eip", !Ref ProjectName]]
+
+  ChatInstance1:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-06fdbb60c8e83aa5e
+      KeyName: !Ref KeyName
+      SubnetId: !Ref SubnetID
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            Encrypted: false
+            VolumeSize: 20
+            VolumeType: "gp2"
+            DeleteOnTermination: true
+      Tags:
+        - Key: "Name"
+          Value: !Join ["-", [!Ref ProjectName, "1"]]
+
+  ChatInstance2:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-06fdbb60c8e83aa5e
+      KeyName: !Ref KeyName
+      SubnetId: !Ref SubnetID
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            Encrypted: false
+            VolumeSize: 20
+            VolumeType: "gp2"
+            DeleteOnTermination: true
+      Tags:
+        - Key: "Name"
+          Value: !Join ["-", [!Ref ProjectName, "2"]]
+
+  ElasticLoadBalancingV2TargetGroup:
+    DependsOn:
+      - ChatInstance1
+      - ChatInstance2
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      Port: 2001
+      Protocol: "TCP"
+      HealthCheckPort: "traffic-port"
+      HealthCheckProtocol: "TCP"
+      HealthCheckTimeoutSeconds: 10
+      UnhealthyThresholdCount: 2
+      TargetType: "instance"
+      HealthyThresholdCount: 5
+      Name: !Join ["-", ["tg", !Ref ProjectName]]
+      HealthCheckEnabled: true
+      VpcId: "vpc-0427faba17b34a05b"
+      Targets:
+        - Id: !Ref ChatInstance1
+          Port: 2002
+        - Id: !Ref ChatInstance2
+          Port: 2002
+
+  ElasticLoadBalancingV2LoadBalancer:
+    DependsOn:
+      - LBEIP
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      Name: !Join ["-", ["nlb", !Ref ProjectName]]
+      Scheme: "internet-facing"
+      Type: "network"
+      SubnetMappings:
+        - SubnetId: !Ref SubnetID
+          AllocationId: !GetAtt LBEIP.AllocationId
+      IpAddressType: "ipv4"
+      LoadBalancerAttributes:
+        - Key: "deletion_protection.enabled"
+          Value: "false"
+        - Key: "load_balancing.cross_zone.enabled"
+          Value: "false"
+        - Key: "access_logs.s3.enabled"
+          Value: "false"
+
+  ElasticLoadBalancingV2Listener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      LoadBalancerArn: !Ref ElasticLoadBalancingV2LoadBalancer
+      Port: 20000
+      Protocol: "TCP"
+      DefaultActions:
+        - TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
+          Type: "forward"
+
+# Add Outputs section here.
+Outputs:
+  NLBPublicDNS:
+    Description: "Public DNS of Elastic Load Balancer"
+    Value: !GetAtt ElasticLoadBalancingV2LoadBalancer.DNSName
